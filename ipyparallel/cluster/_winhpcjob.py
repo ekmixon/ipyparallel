@@ -24,10 +24,7 @@ def as_str(value):
     if isinstance(value, str):
         return value
     elif isinstance(value, bool):
-        if value:
-            return 'true'
-        else:
-            return 'false'
+        return 'true' if value else 'false'
     elif isinstance(value, (int, float)):
         return repr(value)
     else:
@@ -38,25 +35,21 @@ def indent(elem, level=0):
     i = "\n" + level * "  "
     if len(elem):
         if not elem.text or not elem.text.strip():
-            elem.text = i + "  "
+            elem.text = f"{i}  "
         if not elem.tail or not elem.tail.strip():
             elem.tail = i
         for elem in elem:
             indent(elem, level + 1)
         if not elem.tail or not elem.tail.strip():
             elem.tail = i
-    else:
-        if level and (not elem.tail or not elem.tail.strip()):
-            elem.tail = i
+    elif level and (not elem.tail or not elem.tail.strip()):
+        elem.tail = i
 
 
 def find_username():
     domain = os.environ.get('USERDOMAIN')
     username = os.environ.get('USERNAME', '')
-    if domain is None:
-        return username
-    else:
-        return f'{domain}\\{username}'
+    return username if domain is None else f'{domain}\\{username}'
 
 
 class WinHPCJob(Configurable):
@@ -92,8 +85,7 @@ class WinHPCJob(Configurable):
         return self.username
 
     def _write_attr(self, root, attr, key):
-        s = as_str(getattr(self, attr, ''))
-        if s:
+        if s := as_str(getattr(self, attr, '')):
             root.set(key, s)
 
     def as_element(self):
@@ -174,8 +166,7 @@ class WinHPCTask(Configurable):
     environment_variables = Instance(dict, args=(), config=True)
 
     def _write_attr(self, root, attr, key):
-        s = as_str(getattr(self, attr, ''))
-        if s:
+        if s := as_str(getattr(self, attr, '')):
             root.set(key, s)
 
     def as_element(self):
@@ -258,8 +249,8 @@ class IPControllerTask(WinHPCTask):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         the_uuid = uuid.uuid1()
-        self.std_out_file_path = os.path.join('log', 'ipcontroller-%s.out' % the_uuid)
-        self.std_err_file_path = os.path.join('log', 'ipcontroller-%s.err' % the_uuid)
+        self.std_out_file_path = os.path.join('log', f'ipcontroller-{the_uuid}.out')
+        self.std_err_file_path = os.path.join('log', f'ipcontroller-{the_uuid}.err')
 
     @property
     def command_line(self):
@@ -286,8 +277,8 @@ class IPEngineTask(WinHPCTask):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         the_uuid = uuid.uuid1()
-        self.std_out_file_path = os.path.join('log', 'ipengine-%s.out' % the_uuid)
-        self.std_err_file_path = os.path.join('log', 'ipengine-%s.err' % the_uuid)
+        self.std_out_file_path = os.path.join('log', f'ipengine-{the_uuid}.out')
+        self.std_err_file_path = os.path.join('log', f'ipengine-{the_uuid}.err')
 
     @property
     def command_line(self):

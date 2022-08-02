@@ -73,10 +73,7 @@ def weighted(loads):
         idx += 1
     while sums[idy] < y:
         idy += 1
-    if weights[idy] > weights[idx]:
-        return idy
-    else:
-        return idx
+    return idy if weights[idy] > weights[idx] else idx
 
 
 def leastload(loads):
@@ -215,7 +212,7 @@ class TaskScheduler(Scheduler):
             registration_notification=self._register_engine,
             unregistration_notification=self._unregister_engine,
         )
-        self.log.info("Task scheduler started [%s]" % self.scheme_name)
+        self.log.info(f"Task scheduler started [{self.scheme_name}]")
         self.notifier_stream.on_recv(self.dispatch_notification)
 
     # -----------------------------------------------------------------------
@@ -280,10 +277,6 @@ class TaskScheduler(Scheduler):
 
     def _unregister_engine(self, uid):
         """Existing engine with ident `uid` became unavailable."""
-        if len(self.targets) == 1:
-            # this was our only engine
-            pass
-
         # handle any potentially finished tasks:
         self.engine_stream.flush()
 
@@ -431,11 +424,9 @@ class TaskScheduler(Scheduler):
 
         if after.check(self.all_completed, self.all_failed):
             # time deps already met, try to run
-            if not self.maybe_run(job):
-                # can't run yet
-                if msg_id not in self.all_failed:
-                    # could have failed as unreachable
-                    self.save_unmet(job)
+            if not self.maybe_run(job) and msg_id not in self.all_failed:
+                # could have failed as unreachable
+                self.save_unmet(job)
         else:
             self.save_unmet(job)
 
@@ -497,13 +488,11 @@ class TaskScheduler(Scheduler):
 
     def available_engines(self):
         """return a list of available engine indices based on HWM"""
-        if not self.hwm:
-            return list(range(len(self.targets)))
-        available = []
-        for idx in range(len(self.targets)):
-            if self.loads[idx] < self.hwm:
-                available.append(idx)
-        return available
+        return (
+            [idx for idx in range(len(self.targets)) if self.loads[idx] < self.hwm]
+            if self.hwm
+            else list(range(len(self.targets)))
+        )
 
     def maybe_run(self, job):
         """check location dependencies, and run if they are met."""
@@ -583,10 +572,7 @@ class TaskScheduler(Scheduler):
 
     def submit_task(self, job, indices=None):
         """Submit a task to any of a subset of our targets."""
-        if indices:
-            loads = [self.loads[i] for i in indices]
-        else:
-            loads = self.loads
+        loads = [self.loads[i] for i in indices] if indices else self.loads
         idx = self.scheme(loads)
         if indices:
             idx = indices[idx]
@@ -719,7 +705,7 @@ class TaskScheduler(Scheduler):
         if (
             dep_id is None
             or self.hwm
-            and any([load == self.hwm - 1 for load in self.loads])
+            and any(load == self.hwm - 1 for load in self.loads)
         ):
             jobs = self.queue
             using_queue = True

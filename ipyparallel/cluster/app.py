@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """The ipcluster application."""
+
 import asyncio
 import errno
 import json
@@ -127,14 +128,14 @@ otherwise use the 'profile-dir' option.
 stop_aliases = dict(
     signal='IPClusterStop.signal',
 )
-stop_aliases.update(base_aliases)
+stop_aliases |= base_aliases
 stop_flags = dict(
     all=(
         {'IPClusterStop': {'all_cluster_ids': True}},
         "stop all clusters for the selected profile, instead of just one",
     )
 )
-stop_flags.update(base_flags)
+stop_flags |= base_flags
 
 
 class IPClusterStop(BaseParallelApplication):
@@ -164,11 +165,7 @@ class IPClusterStop(BaseParallelApplication):
                 .values()
             )
         else:
-            if self.extra_args:
-                cluster_ids = self.extra_args
-            else:
-                cluster_ids = [self.cluster_id]
-
+            cluster_ids = self.extra_args or [self.cluster_id]
             clusters = []
 
             for cluster_id in cluster_ids:
@@ -199,8 +196,8 @@ class IPClusterStop(BaseParallelApplication):
 
 
 list_aliases = {}
-list_aliases.update(base_aliases)
-list_aliases.update({"o": "IPClusterList.output_format"})
+list_aliases |= base_aliases
+list_aliases["o"] = "IPClusterList.output_format"
 
 
 class IPClusterList(BaseParallelApplication):
@@ -225,9 +222,7 @@ class IPClusterList(BaseParallelApplication):
         clusters = cluster_manager.load_clusters(profile_dirs=profile_dirs)
         if self.output_format == "text":
             # TODO: measure needed profile/cluster id width
-            print(
-                f"{'PROFILE':16} {'CLUSTER ID':32} {'RUNNING':7} {'ENGINES':7} {'LAUNCHER'}"
-            )
+            print(f"{'PROFILE':16} {'CLUSTER ID':32} {'RUNNING':7} {'ENGINES':7} LAUNCHER")
             for cluster in sorted(
                 clusters.values(),
                 key=lambda c: (
@@ -260,28 +255,25 @@ class IPClusterList(BaseParallelApplication):
             raise NotImplementedError(f"No such output format: {self.output_format}")
 
 
-clean_flags = {}
-for key in ('debug', 'quiet'):
-    clean_flags[key] = base_flags[key]
-clean_flags.update(
-    {
-        "force": (
-            {"IPClusterClean": {"force": True}},
-            """
+clean_flags = {key: base_flags[key] for key in ('debug', 'quiet')} | {
+    "force": (
+        {"IPClusterClean": {"force": True}},
+        """
             Force removal of files, even if clusters are running.
 
             WARNING: can leave orphan processes
             """,
-        ),
-        "all": (
-            {"IPClusterClean": {"all_profiles": True}},
-            "Clean all IPython profiles, not just current.",
-        ),
-    }
-)
-clean_aliases = {}
-for key in ('log-level', 'ipython-dir', 'profile-dir', 'profile'):
-    clean_aliases[key] = base_aliases[key]
+    ),
+    "all": (
+        {"IPClusterClean": {"all_profiles": True}},
+        "Clean all IPython profiles, not just current.",
+    ),
+}
+
+clean_aliases = {
+    key: base_aliases[key]
+    for key in ('log-level', 'ipython-dir', 'profile-dir', 'profile')
+}
 
 
 class IPClusterClean(BaseParallelApplication):
@@ -306,15 +298,12 @@ class IPClusterClean(BaseParallelApplication):
     )
 
     def start(self):
-        if self.all_profiles:
-            profile_dirs = None
-        else:
-            profile_dirs = [self.profile_dir.location]
+        profile_dirs = None if self.all_profiles else [self.profile_dir.location]
         clean_cluster_files(profile_dirs, log=self.log, force=self.force)
 
 
 engine_aliases = {}
-engine_aliases.update(base_aliases)
+engine_aliases |= base_aliases
 engine_aliases.update(
     dict(
         n='Cluster.n',
@@ -323,7 +312,7 @@ engine_aliases.update(
     )
 )
 engine_flags = {}
-engine_flags.update(base_flags)
+engine_flags |= base_flags
 
 engine_flags.update(
     dict(
@@ -427,7 +416,6 @@ class IPClusterEngines(BaseParallelApplication):
                 signum = getattr(signal, signame)
             except AttributeError:
                 self.log.debug(f"Not forwarding {signame}")
-                pass
             else:
                 self.log.debug(f"Forwarding {signame} to engines")
                 signal.signal(signum, self.relay_signal)
@@ -494,8 +482,7 @@ class IPClusterEngines(BaseParallelApplication):
             a public interface.
             """
             )
-            engine_output = self.engine_launcher.get_output(remove=True)
-            if engine_output:
+            if engine_output := self.engine_launcher.get_output(remove=True):
                 self.log.error(f"Engine output:\n{engine_output}")
             self.loop.add_callback(self.stop_cluster)
 
@@ -535,14 +522,12 @@ class IPClusterEngines(BaseParallelApplication):
         except KeyboardInterrupt:
             pass
         except zmq.ZMQError as e:
-            if e.errno == errno.EINTR:
-                pass
-            else:
+            if e.errno != errno.EINTR:
                 raise
 
 
 start_aliases = {}
-start_aliases.update(engine_aliases)
+start_aliases |= engine_aliases
 start_aliases.update(
     dict(
         delay='Cluster.delay',
@@ -625,9 +610,7 @@ class IPClusterStart(IPClusterEngines):
         except KeyboardInterrupt:
             pass
         except zmq.ZMQError as e:
-            if e.errno == errno.EINTR:
-                pass
-            else:
+            if e.errno != errno.EINTR:
                 raise
         finally:
             if not self.daemonize:
@@ -703,15 +686,14 @@ class IPCluster(BaseParallelApplication):
     flags = Dict()
 
     def start(self):
-        if self.subapp is None:
-            keys = ', '.join(f"'{key}'" for key in self.subcommands.keys())
-            print("No subcommand specified. Must specify one of: %s" % keys)
-            print()
-            self.print_description()
-            self.print_subcommands()
-            self.exit(1)
-        else:
+        if self.subapp is not None:
             return self.subapp.start()
+        keys = ', '.join(f"'{key}'" for key in self.subcommands.keys())
+        print(f"No subcommand specified. Must specify one of: {keys}")
+        print()
+        self.print_description()
+        self.print_subcommands()
+        self.exit(1)
 
 
 main = IPCluster.launch_instance

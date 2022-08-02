@@ -120,7 +120,7 @@ def run_on_instance(template_name):
     copy_files_to_instance(current_instance_name, "instance_setup.py")
 
     for config_name in os.listdir(MACHINE_CONFIGS_DIR):
-        if config_name == template_name + ".json":
+        if config_name == f"{template_name}.json":
             copy_files_to_instance(
                 current_instance_name,
                 os.path.join(MACHINE_CONFIGS_DIR, config_name),

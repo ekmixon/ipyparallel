@@ -233,7 +233,7 @@ class MPIRectPartitioner2D(RectPartitioner2D):
             if self.slice_copy:
                 self.out_lower_buffers[0] = ascontiguousarray(solution_array[1, :])
             else:
-                for i in range(0, loc_ny + 1):
+                for i in range(loc_ny + 1):
                     self.out_lower_buffers[0][i] = solution_array[1, i]
             mpi.Isend(self.out_lower_buffers[0], lower_x_neigh)
 
@@ -245,7 +245,7 @@ class MPIRectPartitioner2D(RectPartitioner2D):
                     solution_array[loc_nx - 1, :]
                 )
             else:
-                for i in range(0, loc_ny + 1):
+                for i in range(loc_ny + 1):
                     solution_array[loc_nx, i] = self.in_upper_buffers[0][i]
                     self.out_upper_buffers[0][i] = solution_array[loc_nx - 1, i]
             mpi.Isend(self.out_upper_buffers[0], upper_x_neigh)
@@ -255,7 +255,7 @@ class MPIRectPartitioner2D(RectPartitioner2D):
             if self.slice_copy:
                 solution_array[0, :] = self.in_lower_buffers[0]
             else:
-                for i in range(0, loc_ny + 1):
+                for i in range(loc_ny + 1):
                     solution_array[0, i] = self.in_lower_buffers[0][i]
 
         # communicate in the y-direction afterwards
@@ -263,7 +263,7 @@ class MPIRectPartitioner2D(RectPartitioner2D):
             if self.slice_copy:
                 self.out_lower_buffers[1] = ascontiguousarray(solution_array[:, 1])
             else:
-                for i in range(0, loc_nx + 1):
+                for i in range(loc_nx + 1):
                     self.out_lower_buffers[1][i] = solution_array[i, 1]
             mpi.Isend(self.out_lower_buffers[1], lower_y_neigh)
 
@@ -275,7 +275,7 @@ class MPIRectPartitioner2D(RectPartitioner2D):
                     solution_array[:, loc_ny - 1]
                 )
             else:
-                for i in range(0, loc_nx + 1):
+                for i in range(loc_nx + 1):
                     solution_array[i, loc_ny] = self.in_upper_buffers[1][i]
                     self.out_upper_buffers[1][i] = solution_array[i, loc_ny - 1]
             mpi.Isend(self.out_upper_buffers[1], upper_y_neigh)
@@ -285,7 +285,7 @@ class MPIRectPartitioner2D(RectPartitioner2D):
             if self.slice_copy:
                 solution_array[:, 0] = self.in_lower_buffers[1]
             else:
-                for i in range(0, loc_nx + 1):
+                for i in range(loc_nx + 1):
                     solution_array[i, 0] = self.in_lower_buffers[1][i]
 
 

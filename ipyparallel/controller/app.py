@@ -2,6 +2,7 @@
 """
 The IPython controller application.
 """
+
 # Copyright (c) IPython Development Team.
 # Distributed under the terms of the Modified BSD License.
 import json
@@ -100,7 +101,7 @@ ipcontroller --scheme=pure  # use the pure zeromq scheduler
 # The main application
 # -----------------------------------------------------------------------------
 flags = {}
-flags.update(base_flags)
+flags |= base_flags
 flags.update(
     {
         'usethreads': (
@@ -155,7 +156,7 @@ aliases = dict(
     scheme='TaskScheduler.scheme_name',
     hwm='TaskScheduler.hwm',
 )
-aliases.update(base_aliases)
+aliases |= base_aliases
 aliases.update(session_aliases)
 
 _db_shortcuts = {
@@ -307,8 +308,8 @@ class IPController(BaseParallelApplication):
 
     @observe('use_threads')
     def _use_threads_changed(self, change):
-        self.mq_class = 'zmq.devices.{}MonitoredQueue'.format(
-            'Thread' if change['new'] else 'Process'
+        self.mq_class = (
+            f"zmq.devices.{'Thread' if change['new'] else 'Process'}MonitoredQueue"
         )
 
     write_connection_files = Bool(
@@ -747,7 +748,7 @@ class IPController(BaseParallelApplication):
             try:
                 self.load_config_from_json()
             except (AssertionError, OSError) as e:
-                self.log.error("Could not load config from JSON: %s" % e)
+                self.log.error(f"Could not load config from JSON: {e}")
             else:
                 # successfully loaded config from JSON, and reuse=True
                 # no need to write back the same file

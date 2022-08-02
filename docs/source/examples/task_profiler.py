@@ -55,8 +55,10 @@ def main():
 
     # the jobs should take a random time within a range
     times = [
-        random.random() * (opts.tmax - opts.tmin) + opts.tmin for i in range(opts.n)
+        random.random() * (opts.tmax - opts.tmin) + opts.tmin
+        for _ in range(opts.n)
     ]
+
     stime = sum(times)
 
     print(

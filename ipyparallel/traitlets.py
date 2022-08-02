@@ -22,14 +22,12 @@ class Launcher(Type):
     @property
     def help(self):
         """Extend help by listing currently installed choices"""
-        chunks = [self._original_help]
-        chunks.append("Currently installed: ")
-        for key, entry_point in self.load_entry_points().items():
-            chunks.append(
-                "  - {}: {}.{}".format(
-                    key, entry_point.module_name, entry_point.object_name
-                )
-            )
+        chunks = [self._original_help, "Currently installed: "]
+        chunks.extend(
+            f"  - {key}: {entry_point.module_name}.{entry_point.object_name}"
+            for key, entry_point in self.load_entry_points().items()
+        )
+
         return '\n'.join(chunks)
 
     @help.setter

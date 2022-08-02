@@ -115,14 +115,13 @@ class DepthTestingSuite:
 
     def teardown(self, *args):
         replies_key = tuple(args)
-        if replies_key in apply_replies:
-            if any(
-                not np.array_equal(new_reply, stored_reply)
-                for new_reply, stored_reply in zip(
-                    self.reply, apply_replies[replies_key]
-                )
-            ):
-                raise ArrayNotEqual('DepthTestingSuite', args)
+        if replies_key in apply_replies and any(
+            not np.array_equal(new_reply, stored_reply)
+            for new_reply, stored_reply in zip(
+                self.reply, apply_replies[replies_key]
+            )
+        ):
+            raise ArrayNotEqual('DepthTestingSuite', args)
         if self.client:
             self.client.close()
 
@@ -131,6 +130,9 @@ number_of_messages = [1, 5, 10, 20, 50, 75, 100]
 
 
 def make_multiple_message_benchmark(get_view):
+
+
+
     class AsyncMessagesSuite:
         param_names = ['Number of engines', 'number_of_messages']
         timer = timeit.default_timer
@@ -150,7 +152,7 @@ def make_multiple_message_benchmark(get_view):
 
         def time_async_messages(self, number_of_engines, number_of_messages):
             replies = []
-            for i in range(number_of_messages):
+            for _ in range(number_of_messages):
                 reply = self.view.apply_async(echo, np.array([0] * 1000, dtype=np.int8))
                 replies.append(reply)
             for reply in replies:
@@ -159,6 +161,7 @@ def make_multiple_message_benchmark(get_view):
         def teardown(self, *args):
             if self.client:
                 self.client.close()
+
 
     return AsyncMessagesSuite
 

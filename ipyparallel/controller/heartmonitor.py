@@ -165,8 +165,7 @@ class HeartMonitor(LoggingConfigurable):
             self.log.debug("heartbeat::sending %s", self.lifetime)
         good_hearts = self.hearts.intersection(self.responses)
         missed_beats = self.hearts.difference(good_hearts)
-        new_hearts = self.responses.difference(good_hearts)
-        if new_hearts:
+        if new_hearts := self.responses.difference(good_hearts):
             self.handle_new_hearts(new_hearts)
         heart_failures, on_probation = self._check_missed(
             missed_beats, self.on_probation, self.hearts

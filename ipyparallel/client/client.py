@@ -105,21 +105,18 @@ class ExecuteReply(RichOutput):
 
     @property
     def source(self):
-        execute_result = self.metadata['execute_result']
-        if execute_result:
+        if execute_result := self.metadata['execute_result']:
             return execute_result.get('source', '')
 
     @property
     def data(self):
-        execute_result = self.metadata['execute_result']
-        if execute_result:
+        if execute_result := self.metadata['execute_result']:
             return execute_result.get('data', {})
         return {}
 
     @property
     def _metadata(self):
-        execute_result = self.metadata['execute_result']
-        if execute_result:
+        if execute_result := self.metadata['execute_result']:
             return execute_result.get('metadata', {})
         return {}
 
@@ -132,10 +129,7 @@ class ExecuteReply(RichOutput):
         if mime not in self.data:
             return
         data = self.data[mime]
-        if mime in self._metadata:
-            return data, self._metadata[mime]
-        else:
-            return data
+        return (data, self._metadata[mime]) if mime in self._metadata else data
 
     def _repr_mimebundle_(self, *args, **kwargs):
         data, md = self.data, self.metadata
@@ -156,7 +150,7 @@ class ExecuteReply(RichOutput):
         execute_result = self.metadata['execute_result'] or {'data': {}}
         text_out = execute_result['data'].get('text/plain', '')
         if len(text_out) > 32:
-            text_out = text_out[:29] + '...'
+            text_out = f'{text_out[:29]}...'
 
         return "<ExecuteReply[%i]: %s>" % (self.execution_count, text_out)
 
@@ -168,11 +162,7 @@ class ExecuteReply(RichOutput):
             return ''
 
         ip = get_ipython()
-        if ip is None:
-            colors = "NoColor"
-        else:
-            colors = ip.colors
-
+        colors = "NoColor" if ip is None else ip.colors
         if colors == "NoColor":
             out = normal = ""
         else:
@@ -348,15 +338,14 @@ class Client(HasTraits):
     profile = Unicode()
 
     def _profile_default(self):
-        if BaseIPythonApplication.initialized():
-            # an IPython app *might* be running, try to get its profile
-            try:
-                return BaseIPythonApplication.instance().profile
-            except (AttributeError, MultipleInstanceError):
-                # could be a *different* subclass of config.Application,
-                # which would raise one of these two errors.
-                return 'default'
-        else:
+        if not BaseIPythonApplication.initialized():
+            return 'default'
+        # an IPython app *might* be running, try to get its profile
+        try:
+            return BaseIPythonApplication.instance().profile
+        except (AttributeError, MultipleInstanceError):
+            # could be a *different* subclass of config.Application,
+            # which would raise one of these two errors.
             return 'default'
 
     _outstanding_dict = Instance('collections.defaultdict', (set,))
@@ -387,9 +376,9 @@ class Client(HasTraits):
     _task_scheme = Unicode()
     _closed = False
 
-    def __new__(self, *args, **kw):
+    def __new__(cls, *args, **kw):
         # don't raise on positional args
-        return HasTraits.__new__(self, **kw)
+        return HasTraits.__new__(cls, **kw)
 
     def __init__(
         self,
@@ -560,7 +549,7 @@ class Client(HasTraits):
             if tunnel.try_passwordless_ssh(sshserver, sshkey, paramiko):
                 password = False
             else:
-                password = getpass("SSH Password for %s: " % sshserver)
+                password = getpass(f"SSH Password for {sshserver}: ")
         ssh_kwargs = dict(keyfile=sshkey, password=password, paramiko=paramiko)
 
         # configure and construct the session
@@ -622,11 +611,10 @@ class Client(HasTraits):
         ip = get_ipython()
         if ip is None:
             return
-        else:
-            if 'px' not in ip.magics_manager.magics["line"]:
-                # in IPython but we are the first Client.
-                # activate a default view for parallel magics.
-                self.activate()
+        if 'px' not in ip.magics_manager.magics["line"]:
+            # in IPython but we are the first Client.
+            # activate a default view for parallel magics.
+            self.activate()
 
     def __del__(self):
         """cleanup sockets, but _not_ context."""
@@ -700,20 +688,24 @@ class Client(HasTraits):
         """Turn valid target IDs or 'all' into two lists:
         (int_ids, uuids).
         """
-        if not self._ids:
-            # flush notification socket if no engines yet, just in case
-            if not self.ids:
-                raise error.NoEnginesRegistered(
-                    "Can't build targets without any engines"
-                )
+        if not self._ids and not self.ids:
+            raise error.NoEnginesRegistered(
+                "Can't build targets without any engines"
+            )
 
-        if targets is None:
+        if (
+            targets is not None
+            and isinstance(targets, str)
+            and targets.lower() == 'all'
+            or targets is None
+        ):
             targets = self._ids
-        elif isinstance(targets, str):
-            if targets.lower() == 'all':
-                targets = self._ids
-            else:
-                raise TypeError("%r not valid str target, must be 'all'" % (targets))
+        elif (
+            targets is not None
+            and isinstance(targets, str)
+            and targets.lower() != 'all'
+        ):
+            raise TypeError("%r not valid str target, must be 'all'" % (targets))
         elif isinstance(targets, int):
             if targets < 0:
                 targets = self.ids[targets]
@@ -728,8 +720,9 @@ class Client(HasTraits):
 
         if not isinstance(targets, (tuple, list, range)):
             raise TypeError(
-                "targets by int/slice/collection of ints only, not %s" % (type(targets))
+                f"targets by int/slice/collection of ints only, not {type(targets)}"
             )
+
 
         return [self._engines[t].encode("utf8") for t in targets], list(targets)
 
@@ -797,7 +790,7 @@ class Client(HasTraits):
         else:
             self._connected = False
             tb = '\n'.join(content.get('traceback', []))
-            raise Exception("Failed to connect! %s" % tb)
+            raise Exception(f"Failed to connect! {tb}")
 
         self._start_io_thread()
 
@@ -854,7 +847,7 @@ class Client(HasTraits):
         d = {eid: content['uuid']}
         self._update_engines(d)
         event = {'event': 'register'}
-        event.update(content)
+        event |= content
         for callback in self._registration_callbacks:
             callback(event)
 
@@ -872,7 +865,7 @@ class Client(HasTraits):
             self._stop_scheduling_tasks()
 
         event = {"event": "unregister"}
-        event.update(content)
+        event |= content
         for callback in self._registration_callbacks:
             callback(event)
 
@@ -915,14 +908,13 @@ class Client(HasTraits):
             msg_id = parent['msg_id']
 
         future = self._futures.get(msg_id, None)
-        if msg_id not in self.outstanding:
-            if msg_id in self.history:
-                print("got stale result: %s" % msg_id)
-            else:
-                print("got unknown result: %s" % msg_id)
-        else:
+        if msg_id in self.outstanding:
             self.outstanding.remove(msg_id)
 
+        elif msg_id in self.history:
+            print(f"got stale result: {msg_id}")
+        else:
+            print(f"got unknown result: {msg_id}")
         content = msg['content']
         header = msg['header']
 
@@ -950,10 +942,7 @@ class Client(HasTraits):
             out_future = self._output_futures.get(msg_id)
             if out_future and not out_future.done():
                 out_future.set_result(None)
-        elif content['status'] == 'resubmitted':
-            # TODO: handle resubmission
-            pass
-        else:
+        elif content['status'] != 'resubmitted':
             self.results[msg_id] = self._unwrap_exception(content)
         if content['status'] != 'ok' and not content.get('engine_info'):
             # not an engine failure, don't expect output
@@ -976,15 +965,14 @@ class Client(HasTraits):
             msg_id = parent['msg_id']
 
         future = self._futures.get(msg_id, None)
-        if msg_id not in self.outstanding:
-            if msg_id in self.history:
-                print("got stale result: %s" % msg_id)
-                print(self.results[msg_id])
-                print(msg)
-            else:
-                print("got unknown result: %s" % msg_id)
-        else:
+        if msg_id in self.outstanding:
             self.outstanding.remove(msg_id)
+        elif msg_id in self.history:
+            print(f"got stale result: {msg_id}")
+            print(self.results[msg_id])
+            print(msg)
+        else:
+            print(f"got unknown result: {msg_id}")
         content = msg['content']
         header = msg['header']
 
@@ -1019,10 +1007,7 @@ class Client(HasTraits):
             out_future = self._output_futures.get(msg_id)
             if out_future and not out_future.done():
                 out_future.set_result(None)
-        elif content['status'] == 'resubmitted':
-            # TODO: handle resubmission
-            pass
-        else:
+        elif content['status'] != 'resubmitted':
             self.results[msg_id] = self._unwrap_exception(content)
         if content['status'] != 'ok' and not content.get('engine_info'):
             # not an engine failure, don't expect output

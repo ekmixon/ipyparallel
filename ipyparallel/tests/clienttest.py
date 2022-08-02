@@ -82,7 +82,7 @@ def skip_without(*names):
             try:
                 __import__(name)
             except ImportError:
-                pytest.skip("Test requires %s" % name)
+                pytest.skip(f"Test requires {name}")
         return f(*args, **kwargs)
 
     return skip_without_names
@@ -90,12 +90,7 @@ def skip_without(*names):
 
 @contextmanager
 def raises_remote(etype):
-    if isinstance(etype, str):
-        # allow Exception or 'Exception'
-        expected_ename = etype
-    else:
-        expected_ename = etype.__name__
-
+    expected_ename = etype if isinstance(etype, str) else etype.__name__
     try:
         try:
             yield
@@ -139,7 +134,7 @@ class ClusterTestCase(BaseZMQTestCase):
         n = len(self.engines) + self.base_engine_count
         self.client.wait_for_engines(n, timeout=timeout)
 
-        assert not len(self.client.ids) < n, "waiting for engines timed out"
+        assert len(self.client.ids) >= n, "waiting for engines timed out"
 
     def client_wait(self, client, jobs=None, timeout=-1):
         """my wait wrapper, sets a default finite timeout to avoid hangs"""

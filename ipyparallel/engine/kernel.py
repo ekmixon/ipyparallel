@@ -25,7 +25,7 @@ class IPythonParallelKernel(IPythonKernel):
 
     def _topic(self, topic):
         """prefixed topic for IOPub messages"""
-        base = "engine.%s" % self.engine_id
+        base = f"engine.{self.engine_id}"
 
         return f"{base}.{topic}".encode()
 
@@ -125,10 +125,10 @@ class IPythonParallelKernel(IPythonKernel):
 
             fname = getattr(f, '__name__', 'f')
 
-            fname = prefix + "f"
-            argname = prefix + "args"
-            kwargname = prefix + "kwargs"
-            resultname = prefix + "result"
+            fname = f"{prefix}f"
+            argname = f"{prefix}args"
+            kwargname = f"{prefix}kwargs"
+            resultname = f"{prefix}result"
 
             ns = {fname: f, argname: args, kwargname: kwargs, resultname: None}
             # print ns

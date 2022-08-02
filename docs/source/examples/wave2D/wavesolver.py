@@ -143,8 +143,8 @@ class WaveSolver:
         # set initial condition (pointwise - allows straight if-tests in I(x,y)):
         t = 0.0
         if implementation['ic'] == 'scalar':
-            for i in range(0, nx + 1):
-                for j in range(0, ny + 1):
+            for i in range(nx + 1):
+                for j in range(ny + 1):
                     u_1[i, j] = I(x[i], y[j])
 
             for i in range(1, nx):
@@ -158,16 +158,16 @@ class WaveSolver:
 
             # boundary values of u_2 (equals u(t=dt) due to du/dt=0)
             i = 0
-            for j in range(0, ny + 1):
+            for j in range(ny + 1):
                 u_2[i, j] = bc(x[i], y[j], t + dt)
             j = 0
-            for i in range(0, nx + 1):
+            for i in range(nx + 1):
                 u_2[i, j] = bc(x[i], y[j], t + dt)
             i = nx
-            for j in range(0, ny + 1):
+            for j in range(ny + 1):
                 u_2[i, j] = bc(x[i], y[j], t + dt)
             j = ny
-            for i in range(0, nx + 1):
+            for i in range(nx + 1):
                 u_2[i, j] = bc(x[i], y[j], t + dt)
 
         elif implementation['ic'] == 'vectorized':

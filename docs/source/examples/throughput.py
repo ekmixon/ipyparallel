@@ -29,7 +29,7 @@ def time_throughput(nmessages, t=0, f=wait):
     view.apply_sync(echo, '')
     client.spin()
     tic = time.time()
-    for i in range(nmessages):
+    for _ in range(nmessages):
         view.apply(f, t)
     lap = time.time()
     client.wait()

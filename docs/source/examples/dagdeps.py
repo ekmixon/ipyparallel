@@ -75,10 +75,7 @@ def validate_tree(G, results):
         started = results[node].metadata.started
         for parent in G.predecessors(node):
             finished = results[parent].metadata.completed
-            assert started > finished, "{} should have happened after {}".format(
-                node,
-                parent,
-            )
+            assert started > finished, f"{node} should have happened after {parent}"
 
 
 def main(nodes, edges):
@@ -94,12 +91,9 @@ def main(nodes, edges):
 
     print("building DAG")
     G = random_dag(nodes, edges)
-    jobs = {}
     pos = {}
     colors = {}
-    for node in G:
-        jobs[node] = randomwait
-
+    jobs = {node: randomwait for node in G}
     client = parallel.Client()
     view = client.load_balanced_view()
     print("submitting %i tasks with %i dependencies" % (nodes, edges))

@@ -33,7 +33,7 @@ def profile_many_empty_tasks(lview, n, block=True):
 
 def profile_tasks_with_large_data(lview, num_bytes):
     for _ in range(10):
-        for i in range(10):
+        for _ in range(10):
             lview.apply_sync(echo(0), np.array([0] * num_bytes, dtype=np.int8))
 
 

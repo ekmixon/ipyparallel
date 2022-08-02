@@ -130,7 +130,7 @@ class AsyncResult(Future):
                         future.set_result(result)
                         future.output.set_result(None)
                 if not future:
-                    raise KeyError("No Future or result for msg_id: %s" % msg_id)
+                    raise KeyError(f"No Future or result for msg_id: {msg_id}")
                 self._children.append(future)
 
         self._result_future = multi_future(self._children)
@@ -150,14 +150,15 @@ class AsyncResult(Future):
         """Callback for iopub messages registered during AsyncResult.stream_output()"""
         msg_type = msg['header']['msg_type']
         ip = get_ipython()
-        if ip is not None:
-            in_kernel = getattr(ip, 'kernel', None) is not None
-        else:
-            in_kernel = False
-
         if msg_type == 'stream':
             msg_content = msg['content']
             stream_name = msg_content['name']
+
+            in_kernel = (
+                getattr(ip, 'kernel', None) is not None
+                if ip is not None
+                else False
+            )
 
             if in_kernel:
                 parent_msg_id = msg['parent_header']['msg_id']
@@ -170,12 +171,11 @@ class AsyncResult(Future):
                     self._already_streamed[display_id] = True
                     update = False
                 publish_display_data(
-                    {
-                        "text/plain": f"[{stream_name}:{eid}] " + full_stream,
-                    },
+                    {"text/plain": f"[{stream_name}:{eid}] {full_stream}"},
                     transient={"display_id": display_id},
                     update=update,
                 )
+
                 return
             else:
                 stream = getattr(sys, stream_name, sys.stdout)
@@ -248,8 +248,7 @@ class AsyncResult(Future):
 
             # publish already-captured output immediately
             for name in ("stdout", "stderr"):
-                text = md[name]
-                if text:
+                if text := md[name]:
                     iopub_callback(
                         {
                             "header": {"msg_type": "stream"},
@@ -283,10 +282,7 @@ class AsyncResult(Future):
 
     def __repr__(self):
         if self._ready:
-            if self._success:
-                state = "finished"
-            else:
-                state = "failed"
+            state = "finished" if self._success else "failed"
         else:
             state = "pending"
         return f"<{self.__class__.__name__}({self._fname}): {state}>"
@@ -306,10 +302,7 @@ class AsyncResult(Future):
         Override me in subclasses for turning a list of results
         into the expected form.
         """
-        if self._single_result:
-            return res[0]
-        else:
-            return res
+        return res[0] if self._single_result else res
 
     def get(self, timeout=None, return_exceptions=None, return_when=None):
         """Return the result when it arrives.
@@ -356,12 +349,11 @@ class AsyncResult(Future):
         if self._ready:
             if self._success:
                 return self.result()
+            e = self.exception()
+            if return_exceptions:
+                return self._reconstruct_result(self._raw_results)
             else:
-                e = self.exception()
-                if return_exceptions:
-                    return self._reconstruct_result(self._raw_results)
-                else:
-                    raise e
+                raise e
         else:
             if return_when == FIRST_EXCEPTION:
                 # this should only occur if there was an exception
@@ -442,13 +434,7 @@ class AsyncResult(Future):
         if len(self._children) == 1:
             # nothing to do if we're already representing a single message
             return (self,)
-            self.owner = False
-
-        if self._targets is None:
-            _targets = repeat(None)
-        else:
-            _targets = self._targets
-
+        _targets = repeat(None) if self._targets is None else self._targets
         flatten = not isinstance(self, AsyncMapResult)
         return tuple(
             AsyncResult(
@@ -621,10 +607,7 @@ class AsyncResult(Future):
     def metadata(self):
         """property for accessing execution metadata."""
         self._parse_metadata_dates()
-        if self._single_result:
-            return self._metadata[0]
-        else:
-            return self._metadata
+        return self._metadata[0] if self._single_result else self._metadata
 
     @property
     def result_dict(self):
@@ -703,10 +686,7 @@ class AsyncResult(Future):
             self.wait_for_output(0)
             self._parse_metadata_dates()
             values = [md[key] for md in self._metadata]
-            if self._single_result:
-                return values[0]
-            else:
-                return values
+            return values[0] if self._single_result else values
         else:
             raise TypeError(
                 "Invalid key type %r, must be 'int','slice', or 'str'" % type(key)
@@ -818,11 +798,11 @@ class AsyncResult(Future):
 
         Computed as the sum of (completed-started) of each task
         """
-        t = 0
         self._parse_metadata_dates()
-        for md in self._metadata:
-            t += compare_datetimes(md['completed'], md['started']).total_seconds()
-        return t
+        return sum(
+            compare_datetimes(md['completed'], md['started']).total_seconds()
+            for md in self._metadata
+        )
 
     @property
     @check_ready
@@ -908,17 +888,8 @@ class AsyncResult(Future):
             else:
                 self._last_display_prefix = prefix
 
-        if prefix and not self._stream_trailing_newline:
-            # prefix changed, no trailing newline; insert newline
-            pre = "\n"
-        else:
-            pre = ""
-
-        if prefix:
-            sep = "\n"
-        else:
-            sep = ""
-
+        pre = "\n" if prefix and not self._stream_trailing_newline else ""
+        sep = "\n" if prefix else ""
         self._stream_trailing_newline = text.endswith("\n")
         print(f"{pre}{prefix}{sep}{text}", file=file, end="")
 
@@ -1021,9 +992,7 @@ class AsyncResult(Future):
 
             if not result_only:
                 if groupby == 'order':
-                    output_dict = {
-                        eid: outputs for eid, outputs in zip(targets, output_lists)
-                    }
+                    output_dict = dict(zip(targets, output_lists))
                     N = max(len(outputs) for outputs in output_lists)
                     for i in range(N):
                         for eid in targets:
@@ -1083,18 +1052,17 @@ class AsyncMapResult(AsyncResult):
 
     def _reconstruct_result(self, res):
         """Perform the gather on the actual results."""
-        if self._return_exceptions:
-            if any(isinstance(r, Exception) for r in res):
-                # running with _return_exceptions,
-                # cannot reconstruct original
-                # use simple chain iterable
-                flattened = []
-                for r in res:
-                    if isinstance(r, Exception):
-                        flattened.append(r)
-                    else:
-                        flattened.extend(r)
-                return flattened
+        if self._return_exceptions and any(isinstance(r, Exception) for r in res):
+            # running with _return_exceptions,
+            # cannot reconstruct original
+            # use simple chain iterable
+            flattened = []
+            for r in res:
+                if isinstance(r, Exception):
+                    flattened.append(r)
+                else:
+                    flattened.extend(r)
+            return flattened
         return self._mapObject.joinPartitions(res)
 
     # asynchronous iterator:
@@ -1165,12 +1133,10 @@ class AsyncHubResult(AsyncResult):
         if self._ready:
             return True
         local_ids = [m for m in self.msg_ids if m in self._client.outstanding]
-        local_ready = self._client.wait(local_ids, timeout)
-        if local_ready:
-            remote_ids = [m for m in self.msg_ids if m not in self._client.results]
-            if not remote_ids:
-                self._ready = True
-            else:
+        if local_ready := self._client.wait(local_ids, timeout):
+            if remote_ids := [
+                m for m in self.msg_ids if m not in self._client.results
+            ]:
                 rdict = self._client.result_status(remote_ids, status_only=False)
                 pending = rdict['pending']
                 while pending and (
@@ -1182,6 +1148,8 @@ class AsyncHubResult(AsyncResult):
                         time.sleep(0.1)
                 if not pending:
                     self._ready = True
+            else:
+                self._ready = True
         if self._ready:
             self._output_ready = True
             try:

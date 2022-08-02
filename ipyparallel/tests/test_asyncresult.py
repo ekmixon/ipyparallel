@@ -214,7 +214,7 @@ class AsyncResultTest(ClusterTestCase):
         try:
             time.sleep(0.25)
             hr = rc2.get_result(ar.msg_ids)
-            self.assertTrue(hr.elapsed > 0.0, "got bad elapsed: %s" % hr.elapsed)
+            self.assertTrue(hr.elapsed > 0.0, f"got bad elapsed: {hr.elapsed}")
             hr.get(1)
             self.assertTrue(
                 hr.wall_time < ar.wall_time + 0.2,
@@ -315,9 +315,9 @@ class AsyncResultTest(ClusterTestCase):
 
         ar.get(5)
         assert 4 in found
-        assert len(found) > 1, (
-            "should have seen data multiple times, but got: %s" % found
-        )
+        assert (
+            len(found) > 1
+        ), f"should have seen data multiple times, but got: {found}"
 
     def test_not_single_result(self):
         save_build = self.client._build_targets

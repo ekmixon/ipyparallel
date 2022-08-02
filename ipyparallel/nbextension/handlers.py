@@ -62,7 +62,7 @@ class ClusterListHandler(ClusterHandler):
             - default profile
             - default cluster id
             """
-            running = True if model.get("controller") else False
+            running = bool(model.get("controller"))
             profile = model['cluster']['profile']
             cluster_id = model['cluster']['cluster_id']
             default_profile = profile == 'default'

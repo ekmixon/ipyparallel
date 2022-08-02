@@ -38,10 +38,9 @@ def get_benchmark_type(benchmark_name):
     for benchmark_type in BenchmarkType:
         if benchmark_type.value.lower() in benchmark_name.lower():
             return benchmark_type
-    else:
-        raise NotImplementedError(
-            f"Couldn't find matching benchmarkType for {benchmark_name} "
-        )
+    raise NotImplementedError(
+        f"Couldn't find matching benchmarkType for {benchmark_name} "
+    )
 
 
 def get_scheduler_type(benchmark_name):
@@ -125,14 +124,14 @@ class Result:
             self.number_of_messages = int(param[1])
         elif benchmark_type is BenchmarkType.DEPTH_TESTING:
             self.number_of_engines = int(param[0])
-            self.is_coalescing = True if param[1] == 'True' else False
+            self.is_coalescing = param[1] == 'True'
             self.depth = int(param[2])
         else:
             raise NotImplementedError('BenchmarkType not found in Result constructor')
 
 
 def get_benchmark_results():
-    results_for_machines = {
+    return {
         file_name: BenchmarkResult(
             os.path.join(os.getcwd(), RESULTS_DIR, dir_content, file_name)
         )
@@ -144,8 +143,6 @@ def get_benchmark_results():
         for file_name in os.listdir(f"{RESULTS_DIR}/{dir_content}")
         if "machine" not in file_name
     }
-
-    return results_for_machines
 
 
 def get_value_dict(engines_or_cores='engines', bytes_or_tasks='tasks'):

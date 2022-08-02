@@ -174,23 +174,10 @@ class CannedFunction(CannedObject):
     def __init__(self, f):
         self._check_type(f)
         self.code = f.__code__
-        if f.__defaults__:
-            self.defaults = [can(fd) for fd in f.__defaults__]
-        else:
-            self.defaults = None
-
-        if f.__kwdefaults__:
-            self.kwdefaults = can_dict(f.__kwdefaults__)
-        else:
-            self.kwdefaults = None
-
-        if f.__annotations__:
-            self.annotations = can_dict(f.__annotations__)
-        else:
-            self.annotations = None
-
-        closure = f.__closure__
-        if closure:
+        self.defaults = [can(fd) for fd in f.__defaults__] if f.__defaults__ else None
+        self.kwdefaults = can_dict(f.__kwdefaults__) if f.__kwdefaults__ else None
+        self.annotations = can_dict(f.__annotations__) if f.__annotations__ else None
+        if closure := f.__closure__:
             self.closure = tuple(can(cell) for cell in closure)
         else:
             self.closure = None
@@ -215,15 +202,8 @@ class CannedFunction(CannedObject):
         else:
             defaults = None
 
-        if self.kwdefaults:
-            kwdefaults = uncan_dict(self.kwdefaults)
-        else:
-            kwdefaults = None
-        if self.annotations:
-            annotations = uncan_dict(self.annotations)
-        else:
-            annotations = {}
-
+        kwdefaults = uncan_dict(self.kwdefaults) if self.kwdefaults else None
+        annotations = uncan_dict(self.annotations) if self.annotations else {}
         if self.closure:
             closure = tuple(uncan(cell, g) for cell in self.closure)
         else:
@@ -297,11 +277,7 @@ class CannedClass(CannedObject):
         for k, v in cls.__dict__.items():
             if k not in ('__weakref__', '__dict__'):
                 self._canned_dict[k] = can(v)
-        if self.old_style:
-            mro = []
-        else:
-            mro = cls.mro()
-
+        mro = [] if self.old_style else cls.mro()
         self.parents = [can(c) for c in mro[1:]]
         self.buffers = []
 
@@ -343,13 +319,12 @@ class CannedArray(CannedObject):
         from numpy import frombuffer
 
         data = self.buffers[0]
-        if self.pickled:
-            from . import serialize
-
-            # we just pickled it
-            return serialize.pickle.loads(data)
-        else:
+        if not self.pickled:
             return frombuffer(data, dtype=self.dtype).reshape(self.shape)
+        from . import serialize
+
+        # we just pickled it
+        return serialize.pickle.loads(data)
 
 
 class CannedBytes(CannedObject):
@@ -362,10 +337,7 @@ class CannedBytes(CannedObject):
 
     @staticmethod
     def wrap(data):
-        if isinstance(data, bytes):
-            return data
-        else:
-            return memoryview(data).tobytes()
+        return data if isinstance(data, bytes) else memoryview(data).tobytes()
 
 
 class CannedMemoryView(CannedBytes):
@@ -401,10 +373,7 @@ def istype(obj, check):
     This won't catch subclasses.
     """
     if isinstance(check, tuple):
-        for cls in check:
-            if type(obj) is cls:
-                return True
-        return False
+        return any(type(obj) is cls for cls in check)
     else:
         return type(obj) is check
 
@@ -439,13 +408,7 @@ def can_class(obj):
 
 def can_dict(obj):
     """can the *values* of a dict"""
-    if istype(obj, dict):
-        newobj = {}
-        for k, v in obj.items():
-            newobj[k] = can(v)
-        return newobj
-    else:
-        return obj
+    return {k: can(v) for k, v in obj.items()} if istype(obj, dict) else obj
 
 
 sequence_types = (list, tuple, set)
@@ -453,11 +416,10 @@ sequence_types = (list, tuple, set)
 
 def can_sequence(obj):
     """can the elements of a sequence"""
-    if istype(obj, sequence_types):
-        t = type(obj)
-        return t([can(i) for i in obj])
-    else:
+    if not istype(obj, sequence_types):
         return obj
+    t = type(obj)
+    return t([can(i) for i in obj])
 
 
 def uncan(obj, g=None):
@@ -481,13 +443,7 @@ def uncan(obj, g=None):
 
 
 def uncan_dict(obj, g=None):
-    if istype(obj, dict):
-        newobj = {}
-        for k, v in obj.items():
-            newobj[k] = uncan(v, g)
-        return newobj
-    else:
-        return obj
+    return {k: uncan(v, g) for k, v in obj.items()} if istype(obj, dict) else obj
 
 
 def uncan_sequence(obj, g=None):

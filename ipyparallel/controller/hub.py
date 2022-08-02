@@ -301,8 +301,7 @@ class Hub(LoggingConfigurable):
                 t = self.by_ident.get(t.encode("utf8", "replace"), t)
             _targets.append(t)
         targets = _targets
-        bad_targets = [t for t in targets if t not in self.ids]
-        if bad_targets:
+        if bad_targets := [t for t in targets if t not in self.ids]:
             raise IndexError("No Such Engine: %r" % bad_targets)
         if not targets:
             raise IndexError("No Engines Registered")
@@ -421,10 +420,7 @@ class Hub(LoggingConfigurable):
         self.log.debug("heartbeat::handle_stopped_heart(%r)", heart)
         eid = self.hearts.get(heart, None)
         if eid is None:
-            if heart in self.expect_stopped_hearts:
-                log = self.log.debug
-            else:
-                log = self.log.info
+            log = self.log.debug if heart in self.expect_stopped_hearts else self.log.info
             log(
                 "heartbeat::ignoring heart failure %r (probably unregistered already)",
                 heart,
@@ -835,7 +831,7 @@ class Hub(LoggingConfigurable):
         elif msg_type in ('display_data', 'execute_result'):
             d[msg_type] = content
         elif msg_type == 'data_pub':
-            self.log.info("ignored data_pub message for %s" % msg_id)
+            self.log.info(f"ignored data_pub message for {msg_id}")
         else:
             self.log.warning("unhandled iopub msg_type: %r", msg_type)
 
@@ -865,9 +861,7 @@ class Hub(LoggingConfigurable):
         """Reply with connection addresses for clients."""
         self.log.info("client::client %r connected", client_id)
         content = dict(status='ok')
-        jsonable = {}
-        for eid, ec in self.engines.items():
-            jsonable[str(eid)] = ec.uuid
+        jsonable = {str(eid): ec.uuid for eid, ec in self.engines.items()}
         content['engines'] = jsonable
         self.session.send(
             self.query, 'connection_reply', content, parent=msg, ident=client_id
@@ -1000,9 +994,7 @@ class Hub(LoggingConfigurable):
             except:
                 content = error.wrap_exception()
             # build a fake header:
-            header = {}
-            header['engine'] = uuid
-            header['date'] = util.utcnow()
+            header = {'engine': uuid, 'date': util.utcnow()}
             rec = dict(result_content=content, result_header=header, result_buffers=[])
             rec['completed'] = util.ensure_timezone(header['date'])
             rec['engine_uuid'] = uuid
@@ -1034,9 +1026,9 @@ class Hub(LoggingConfigurable):
         self.ids.add(eid)
         self.engines[eid] = ec
         self.by_ident[ec.ident] = ec.id
-        self.queues[eid] = list()
-        self.tasks[eid] = list()
-        self.completed[eid] = list()
+        self.queues[eid] = []
+        self.tasks[eid] = []
+        self.completed[eid] = []
         self.hearts[heart] = eid
         content = dict(id=eid, uuid=ec.uuid)
         if self.notifier:
@@ -1077,16 +1069,9 @@ class Hub(LoggingConfigurable):
         """save engine mapping to JSON file"""
         if not self.engine_state_file:
             return
-        self.log.debug("save engine state to %s" % self.engine_state_file)
-        state = {}
-        engines = {}
-        for eid, ec in self.engines.items():
-            engines[eid] = ec.uuid
-
-        state['engines'] = engines
-
-        state['next_id'] = self._idcounter
-
+        self.log.debug(f"save engine state to {self.engine_state_file}")
+        engines = {eid: ec.uuid for eid, ec in self.engines.items()}
+        state = {'engines': engines, 'next_id': self._idcounter}
         with open(self.engine_state_file, 'w') as f:
             json.dump(state, f)
 
@@ -1095,7 +1080,7 @@ class Hub(LoggingConfigurable):
         if not os.path.exists(self.engine_state_file):
             return
 
-        self.log.info("loading engine state from %s" % self.engine_state_file)
+        self.log.info(f"loading engine state from {self.engine_state_file}")
 
         with open(self.engine_state_file) as f:
             state = json.load(f)
@@ -1212,8 +1197,7 @@ class Hub(LoggingConfigurable):
                 reply = error.wrap_exception()
                 self.log.exception("Error dropping records")
         else:
-            pending = [m for m in msg_ids if (m in self.pending)]
-            if pending:
+            if pending := [m for m in msg_ids if (m in self.pending)]:
                 try:
                     raise IndexError("msg pending: %r" % pending[0])
                 except:
@@ -1345,9 +1329,17 @@ class Hub(LoggingConfigurable):
 
     def _extract_record(self, rec):
         """decompose a TaskRecord dict into subsection of reply for get_result"""
-        io_dict = {}
-        for key in ('execute_input', 'execute_result', 'error', 'stdout', 'stderr'):
-            io_dict[key] = rec[key]
+        io_dict = {
+            key: rec[key]
+            for key in (
+                'execute_input',
+                'execute_result',
+                'error',
+                'stdout',
+                'stderr',
+            )
+        }
+
         content = {
             'header': rec['header'],
             'metadata': rec['metadata'],
@@ -1357,11 +1349,7 @@ class Hub(LoggingConfigurable):
             'received': rec['received'],
             'io': io_dict,
         }
-        if rec['result_buffers']:
-            buffers = list(rec['result_buffers'])
-        else:
-            buffers = []
-
+        buffers = list(rec['result_buffers']) if rec['result_buffers'] else []
         return content, buffers
 
     def get_results(self, client_id, msg):
@@ -1396,7 +1384,22 @@ class Hub(LoggingConfigurable):
         else:
             records = {}
         for msg_id in msg_ids:
-            if msg_id in self.pending:
+            if (
+                msg_id not in self.pending
+                and msg_id not in self.all_completed
+                and msg_id in records
+                and rec['completed']
+            ):
+                completed.append(msg_id)
+                c, bufs = self._extract_record(records[msg_id])
+                content[msg_id] = c
+                buffers.extend(bufs)
+            elif (
+                msg_id not in self.pending
+                and msg_id not in self.all_completed
+                and msg_id in records
+                or msg_id in self.pending
+            ):
                 pending.append(msg_id)
             elif msg_id in self.all_completed:
                 completed.append(msg_id)
@@ -1404,17 +1407,9 @@ class Hub(LoggingConfigurable):
                     c, bufs = self._extract_record(records[msg_id])
                     content[msg_id] = c
                     buffers.extend(bufs)
-            elif msg_id in records:
-                if rec['completed']:
-                    completed.append(msg_id)
-                    c, bufs = self._extract_record(records[msg_id])
-                    content[msg_id] = c
-                    buffers.extend(bufs)
-                else:
-                    pending.append(msg_id)
             else:
                 try:
-                    raise KeyError('No such message: ' + msg_id)
+                    raise KeyError(f'No such message: {msg_id}')
                 except:
                     content = error.wrap_exception()
                 break
@@ -1447,7 +1442,7 @@ class Hub(LoggingConfigurable):
         query = extract_dates(content.get('query', {}))
         keys = content.get('keys', None)
         buffers = []
-        empty = list()
+        empty = []
         try:
             records = self.db.find_records(query, keys)
         except Exception as e:

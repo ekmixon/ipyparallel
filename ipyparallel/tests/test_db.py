@@ -33,7 +33,7 @@ class TaskDBTest:
         # sleep 1/10 s, to ensure timestamp is different to previous calls
         time.sleep(0.1)
         msg_ids = []
-        for i in range(n):
+        for _ in range(n):
             msg = self.session.msg('apply_request', content=dict(a=5))
             msg['buffers'] = [os.urandom(buffer_size)]
             rec = init_record(msg)
@@ -223,7 +223,7 @@ class TestDictBackend(TaskDBTest, TestCase):
         self.load_records(1)
         self.assertEqual(len(self.db.get_history()), 17)
 
-        for i in range(25):
+        for _ in range(25):
             self.load_records(1)
             self.assertTrue(len(self.db.get_history()) >= 17)
             self.assertTrue(len(self.db.get_history()) <= 20)

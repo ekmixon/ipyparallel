@@ -55,11 +55,10 @@ def _adapt_dict(d):
 def _convert_dict(ds):
     if ds is None:
         return ds
-    else:
-        if isinstance(ds, bytes):
-            # If I understand the sqlite doc correctly, this will always be utf8
-            ds = ds.decode('utf8')
-        return extract_dates(json.loads(ds))
+    if isinstance(ds, bytes):
+        # If I understand the sqlite doc correctly, this will always be utf8
+        ds = ds.decode('utf8')
+    return extract_dates(json.loads(ds))
 
 
 def _adapt_bufs(bufs):
@@ -76,10 +75,7 @@ def _adapt_bufs(bufs):
 
 
 def _convert_bufs(bs):
-    if bs is None:
-        return []
-    else:
-        return pickle.loads(bytes(bs))
+    return [] if bs is None else pickle.loads(bytes(bs))
 
 
 def _adapt_timestamp(dt):
@@ -192,10 +188,7 @@ class SQLiteDB(BaseDB):
 
             if BaseIPythonApplication.initialized():
                 app = BaseIPythonApplication.instance()
-                if app.profile_dir is not None:
-                    self.location = app.profile_dir.location
-                else:
-                    self.location = '.'
+                self.location = '.' if app.profile_dir is None else app.profile_dir.location
             else:
                 self.location = '.'
         self._init_db()
@@ -213,11 +206,8 @@ class SQLiteDB(BaseDB):
 
     def _defaults(self, keys=None):
         """create an empty record"""
-        d = {}
         keys = self._keys if keys is None else keys
-        for key in keys:
-            d[key] = None
-        return d
+        return {key: None for key in keys}
 
     def _check_table(self):
         """Ensure that an incorrect table doesn't exist
@@ -327,7 +317,7 @@ class SQLiteDB(BaseDB):
         skeys.difference_update(set(self._keys))
         skeys.difference_update({'buffers', 'result_buffers'})
         if skeys:
-            raise KeyError("Illegal testing key(s): %s" % skeys)
+            raise KeyError(f"Illegal testing key(s): {skeys}")
 
         for name, sub_check in check.items():
             if isinstance(sub_check, dict):
@@ -344,24 +334,24 @@ class SQLiteDB(BaseDB):
                     else:
                         expr = f"{name} {op} ?"
                         if isinstance(value, (tuple, list)):
-                            if op in null_operators and any([v is None for v in value]):
+                            if op in null_operators and any(
+                                v is None for v in value
+                            ):
                                 # equality tests don't work with NULL
                                 raise ValueError(
                                     "Cannot use %r test with NULL values on SQLite backend"
                                     % test
                                 )
-                            expr = '( %s )' % (join.join([expr] * len(value)))
+                            expr = f'( {join.join([expr] * len(value))} )'
                             args.extend(value)
                         else:
                             args.append(value)
                     expressions.append(expr)
+            elif sub_check is None:
+                expressions.append(f"{name} IS NULL")
             else:
-                # it's an equality check
-                if sub_check is None:
-                    expressions.append("%s IS NULL" % name)
-                else:
-                    expressions.append("%s = ?" % name)
-                    args.append(sub_check)
+                expressions.append(f"{name} = ?")
+                args.append(sub_check)
 
         expr = " AND ".join(expressions)
         return expr, args
@@ -372,7 +362,7 @@ class SQLiteDB(BaseDB):
         d.update(rec)
         d['msg_id'] = msg_id
         line = self._dict_to_list(d)
-        tups = '(%s)' % (','.join(['?'] * len(line)))
+        tups = f"({','.join(['?'] * len(line))})"
         self._db.execute(f"INSERT INTO '{self.table}' VALUES {tups}", line)
         # self._db.commit()
 
@@ -393,7 +383,7 @@ class SQLiteDB(BaseDB):
         keys = sorted(rec.keys())
         values = []
         for key in keys:
-            sets.append('%s = ?' % key)
+            sets.append(f'{key} = ?')
             values.append(rec[key])
         query += ', '.join(sets)
         query += ' WHERE msg_id == ?'
@@ -427,9 +417,8 @@ class SQLiteDB(BaseDB):
             included.
         """
         if keys:
-            bad_keys = [key for key in keys if key not in self._keys]
-            if bad_keys:
-                raise KeyError("Bad record key(s): %s" % bad_keys)
+            if bad_keys := [key for key in keys if key not in self._keys]:
+                raise KeyError(f"Bad record key(s): {bad_keys}")
 
         if keys:
             # ensure msg_id is present and first:

@@ -78,8 +78,7 @@ def cluster(request, ipython_dir):
 def ipython(ipython_dir):
     config = default_config()
     config.TerminalInteractiveShell.simple_prompt = True
-    shell = TerminalInteractiveShell.instance(config=config)
-    yield shell
+    yield TerminalInteractiveShell.instance(config=config)
     TerminalInteractiveShell.clear_instance()
 
 

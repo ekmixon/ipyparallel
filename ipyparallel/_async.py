@@ -90,6 +90,6 @@ class AsyncFirst:
                     continue
                 seen.add(name)
                 if inspect.iscoroutinefunction(value):
-                    async_name = name + "_sync"
+                    async_name = f"{name}_sync"
                     attrs.append(async_name)
         return attrs

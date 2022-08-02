@@ -48,11 +48,7 @@ class PrePickled:
 
 def _nbytes(buf):
     """Return byte-size of a memoryview or buffer"""
-    if isinstance(buf, memoryview):
-        return buf.nbytes
-    else:
-        # not a memoryview, raw bytes
-        return len(buf)
+    return buf.nbytes if isinstance(buf, memoryview) else len(buf)
 
 
 def _extract_buffers(obj, threshold=MAX_BYTES):
@@ -204,7 +200,7 @@ def unpack_apply_message(bufs, g=None, copy=True):
     arg_bufs, kwarg_bufs = bufs[: info['narg_bufs']], bufs[info['narg_bufs'] :]
 
     args = []
-    for i in range(info['nargs']):
+    for _ in range(info['nargs']):
         arg, arg_bufs = deserialize_object(arg_bufs, g)
         args.append(arg)
     args = tuple(args)

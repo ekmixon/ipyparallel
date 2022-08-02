@@ -2,6 +2,7 @@
 """
 A simple IPython logger application
 """
+
 from IPython.core.profiledir import ProfileDir
 from traitlets import Dict
 
@@ -30,7 +31,7 @@ See the `profile` and `profile-dir` options for details.
 # Main application
 # -----------------------------------------------------------------------------
 aliases = {}
-aliases.update(base_aliases)
+aliases |= base_aliases
 aliases.update(dict(url='LogWatcher.url', topics='LogWatcher.topics'))
 
 

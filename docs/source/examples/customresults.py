@@ -34,7 +34,10 @@ def sleep_here(count, t):
     return count, t
 
 
-amr = v.map(sleep_here, range(100), [random.random() for i in range(100)], chunksize=2)
+amr = v.map(
+    sleep_here, range(100), [random.random() for _ in range(100)], chunksize=2
+)
+
 
 pending = set(amr.msg_ids)
 while pending:

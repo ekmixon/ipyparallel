@@ -48,13 +48,12 @@ def bintree(ids, parent=None):
     parents[root] = parent
     if len(ids) == 1:
         return parents
-    else:
-        ids = ids[1:]
-        n = len(ids)
-        left = bintree(ids[: n // 2], parent=root)
-        right = bintree(ids[n // 2 :], parent=root)
-        parents.update(left)
-        parents.update(right)
+    ids = ids[1:]
+    n = len(ids)
+    left = bintree(ids[: n // 2], parent=root)
+    right = bintree(ids[n // 2 :], parent=root)
+    parents |= left
+    parents.update(right)
     return parents
 
 
@@ -137,7 +136,7 @@ class BinaryTreeCommunicator:
         self.upstream = self._ctx.socket(zmq.PUSH)
 
         # bind to ports
-        interface_f = interface + ":%i"
+        interface_f = f"{interface}:%i"
         if self.root:
             pub_port = self.pub.bind_to_random_port(interface)
             self.pub_url = interface_f % pub_port
@@ -232,7 +231,7 @@ class BinaryTreeCommunicator:
         if not flat:
             value = reduce(f, value)
 
-        for i in range(self.nchildren):
+        for _ in range(self.nchildren):
             value = f(value, self.recv_downstream())
 
         if not self.root:

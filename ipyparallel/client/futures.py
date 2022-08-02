@@ -25,9 +25,7 @@ class MessageFuture(Future):
         self.add_done_callback(lambda f: self._evt.set())
 
     def wait(self, timeout=None):
-        if not self.done():
-            return self._evt.wait(timeout)
-        return True
+        return True if self.done() else self._evt.wait(timeout)
 
 
 # The following are from tornado 5.0b1

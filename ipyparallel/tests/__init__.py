@@ -72,7 +72,7 @@ def setup():
     tic = time.time()
     while not os.path.exists(engine_json) or not os.path.exists(client_json):
         if cp.poll() is not None:
-            raise RuntimeError("The test controller exited with status %s" % cp.poll())
+            raise RuntimeError(f"The test controller exited with status {cp.poll()}")
         elif time.time() - tic > 15:
             raise RuntimeError("Timeout waiting for the test controller to start.")
         time.sleep(0.1)
@@ -92,19 +92,20 @@ def add_engines(n=1, profile='iptest', total=False):
         n = max(n - base, 0)
 
     eps = []
-    for i in range(n):
+    for _ in range(n):
         ep = TestProcessLauncher()
         ep.cmd_and_args = ipengine_cmd_argv + [
-            '--profile=%s' % profile,
+            f'--profile={profile}',
             '--InteractiveShell.colors=nocolor',
             '--log-level=10',
         ]
+
         ep.start()
         launchers.append(ep)
         eps.append(ep)
     tic = time.time()
     while len(rc) < base + n:
-        if any([ep.poll() is not None for ep in eps]):
+        if any(ep.poll() is not None for ep in eps):
             raise RuntimeError("A test engine failed to start.")
         elif time.time() - tic > 15:
             raise RuntimeError("Timeout waiting for engines to connect.")
@@ -122,12 +123,10 @@ def teardown():
         p = launchers.pop()
         if p.poll() is None:
             try:
-                f = p.stop()
-                if f:
+                if f := p.stop():
                     asyncio.run(f)
             except Exception as e:
                 print(e)
-                pass
         if p.poll() is None:
             try:
                 time.sleep(0.25)

@@ -28,7 +28,7 @@ def get_initial_results_dir():
                 for dirname in os.listdir(ALL_RESULTS_DIRECTORY)
                 if 'initial_results' in dirname
             ),
-            max(dirname for dirname in os.listdir(ALL_RESULTS_DIRECTORY)),
+            max(os.listdir(ALL_RESULTS_DIRECTORY)),
         ),
     )
 

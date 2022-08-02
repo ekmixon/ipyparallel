@@ -93,10 +93,11 @@ class RemoteError(KernelError):
 
     @staticmethod
     def _get_engine_str(engine_info):
-        if not engine_info:
-            return '[Engine Exception]'
-        else:
-            return f"[{engine_info['engine_id']}:{engine_info['method']}]"
+        return (
+            f"[{engine_info['engine_id']}:{engine_info['method']}]"
+            if engine_info
+            else '[Engine Exception]'
+        )
 
     def render_traceback(self):
         """render traceback to a list of lines"""
@@ -171,7 +172,7 @@ class CompositeError(RemoteError):
         lines = []
         if excid is None:
             for (en, ev, etb, ei) in self.elist[: self.tb_limit]:
-                lines.append(self._get_engine_str(ei) + ":")
+                lines.append(f"{self._get_engine_str(ei)}:")
                 lines.extend((etb or 'No traceback available').splitlines())
                 lines.append('')
             if len(self.elist) > self.tb_limit:
@@ -184,7 +185,7 @@ class CompositeError(RemoteError):
             except:
                 raise IndexError("an exception with index %i does not exist" % excid)
             else:
-                lines.append(self._get_engine_str(ei) + ":")
+                lines.append(f"{self._get_engine_str(ei)}:")
                 lines.extend((etb or 'No traceback available').splitlines())
 
         return lines
@@ -236,36 +237,32 @@ def collect_exceptions(rdict_or_list, method='unspecified'):
             # has the effect of flattening lists of CompositeErrors into one
             # CompositeError
             if en == 'CompositeError':
-                for e in ev.elist:
-                    elist.append(e)
+                elist.extend(iter(ev.elist))
             else:
                 elist.append((en, ev, etb, ei))
-    if len(elist) == 0:
+    if not elist:
         return rdict_or_list
-    else:
-        msg = "one or more exceptions raised in: %s" % (method)
-        err = CompositeError(msg, elist)
-        raise err
+    msg = f"one or more exceptions raised in: {method}"
+    err = CompositeError(msg, elist)
+    raise err
 
 
 def wrap_exception(engine_info={}):
     etype, evalue, tb = sys.exc_info()
     stb = traceback.format_exception(etype, evalue, tb)
-    exc_content = {
+    return {
         'status': 'error',
         'traceback': stb,
         'ename': etype.__name__,
         'evalue': str(evalue),
         'engine_info': engine_info,
     }
-    return exc_content
 
 
 def unwrap_exception(content):
-    err = RemoteError(
+    return RemoteError(
         content['ename'],
         content['evalue'],
         '\n'.join(content['traceback']),
         content.get('engine_info', {}),
     )
-    return err

@@ -20,11 +20,10 @@ class TestBroadcastView(test_view.TestView):
         def broadcast_or_direct(targets):
             if isinstance(targets, int):
                 return real_direct_view(targets)
-            else:
-                self._broadcast_view_used = True
-                return self.client.broadcast_view(
-                    targets, is_coalescing=self.is_coalescing
-                )
+            self._broadcast_view_used = True
+            return self.client.broadcast_view(
+                targets, is_coalescing=self.is_coalescing
+            )
 
         self.client.direct_view = broadcast_or_direct
 

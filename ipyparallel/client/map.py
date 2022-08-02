@@ -113,11 +113,7 @@ class RoundRobinMap(Map):
 
 def mappable(obj):
     """return whether an object is mappable or not."""
-    if isinstance(obj, (tuple, list)):
-        return True
-    if is_array(obj):
-        return True
-    return False
+    return True if isinstance(obj, (tuple, list)) else bool(is_array(obj))
 
 
 dists = {'b': Map, 'r': RoundRobinMap}

@@ -15,15 +15,16 @@ def cmd_run(*args, log_filename=None, error_filename=None):
     if len(args) == 1:
         args = args[0].split(" ")
     print(f'$ {" ".join(args)}')
-    if not log_filename and not error_filename:
-        check_call(args, env=env)
-    else:
+    if log_filename or error_filename:
         check_call(
             args,
             env=env,
             stdout=open(log_filename, 'w'),
             stderr=open(error_filename, 'w'),
         )
+
+    else:
+        check_call(args, env=env)
 
 
 if __name__ == "__main__":

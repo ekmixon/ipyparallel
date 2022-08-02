@@ -128,12 +128,14 @@ class View(HasTraits):
 
         self.set_flags(**flags)
 
-        assert not self.__class__ is View, "Don't use base View objects, use subclasses"
+        assert (
+            self.__class__ is not View
+        ), "Don't use base View objects, use subclasses"
 
     def __repr__(self):
         strtargets = str(self.targets)
         if len(strtargets) > 16:
-            strtargets = strtargets[:12] + '...]'
+            strtargets = f'{strtargets[:12]}...]'
         return f"<{self.__class__.__name__} {strtargets}>"
 
     def __len__(self):
@@ -183,9 +185,7 @@ class View(HasTraits):
 
         """
         # preflight: save flags, and set temporaries
-        saved_flags = {}
-        for f in self._flag_names:
-            saved_flags[f] = getattr(self, f)
+        saved_flags = {f: getattr(self, f) for f in self._flag_names}
         self.set_flags(**kwargs)
         # yield to the with-statement block
         try:
@@ -474,17 +474,14 @@ class DirectView(View):
             else:
                 raise NotImplementedError("remote-only imports not yet implemented")
 
-            key = name + ':' + ','.join(fromlist or [])
+            key = f'{name}:' + ','.join(fromlist or [])
             if level <= 0 and key not in modules:
                 modules.add(key)
                 if not quiet:
                     if fromlist:
-                        print(
-                            "importing %s from %s on engine(s)"
-                            % (','.join(fromlist), name)
-                        )
+                        print(f"importing {','.join(fromlist)} from {name} on engine(s)")
                     else:
-                        print("importing %s on engine(s)" % name)
+                        print(f"importing {name} on engine(s)")
                 results.append(self.apply_async(remote_import, name, fromlist, level))
             # restore override
             builtins.__import__ = save_import
@@ -499,9 +496,6 @@ class DirectView(View):
         except ImportError:
             if local:
                 raise
-            else:
-                # ignore import errors if not doing local imports
-                pass
         finally:
             # always restore __import__
             builtins.__import__ = local_import
@@ -584,10 +578,7 @@ class DirectView(View):
                 self._socket, pf, pargs, pkwargs, track=track, ident=ident
             )
             futures.append(future)
-        if track:
-            trackers = [_.tracker for _ in futures]
-        else:
-            trackers = []
+        trackers = [_.tracker for _ in futures] if track else []
         if isinstance(targets, int):
             futures = futures[0]
         ar = AsyncResult(
@@ -640,7 +631,7 @@ class DirectView(View):
         if block is None:
             block = self.block
 
-        assert len(sequences) > 0, "must have some sequences to map onto!"
+        assert sequences, "must have some sequences to map onto!"
         pf = ParallelFunction(
             self, f, block=block, track=track, return_exceptions=return_exceptions
         )
@@ -731,7 +722,7 @@ class DirectView(View):
         targets = targets if targets is not None else self.targets
         # applier = self.apply_sync if block else self.apply_async
         if not isinstance(ns, dict):
-            raise TypeError("Must be a dict, not %s" % type(ns))
+            raise TypeError(f"Must be a dict, not {type(ns)}")
         return self._really_apply(
             util._push, kwargs=ns, block=block, track=track, targets=targets
         )
@@ -812,7 +803,7 @@ class DirectView(View):
         targets = self.client._build_targets(targets)[1]
 
         futures = []
-        for index, engineid in enumerate(targets):
+        for engineid in targets:
             ar = self.pull(key, block=False, targets=engineid)
             ar.owner = False
             futures.extend(ar._children)
@@ -1172,9 +1163,8 @@ class LoadBalancedView(View):
             t = kwargs['timeout']
             if not isinstance(t, (int, float, type(None))):
                 raise TypeError("Invalid type for timeout: %r" % type(t))
-            if t is not None:
-                if t < 0:
-                    raise ValueError("Invalid timeout: %s" % t)
+            if t is not None and t < 0:
+                raise ValueError(f"Invalid timeout: {t}")
 
             self.timeout = t
 
@@ -1337,7 +1327,7 @@ class LoadBalancedView(View):
         if block is None:
             block = self.block
 
-        assert len(sequences) > 0, "must have some sequences to map onto!"
+        assert sequences, "must have some sequences to map onto!"
 
         pf = ParallelFunction(
             self,
@@ -1404,7 +1394,7 @@ class LoadBalancedView(View):
         Yield-order depends on `ordered` argument.
         """
 
-        assert len(sequences) > 0, "must have some sequences to map onto!"
+        assert sequences, "must have some sequences to map onto!"
 
         if max_outstanding == 'auto':
             max_outstanding = len(self)
@@ -1599,10 +1589,7 @@ class ViewExecutor(concurrent.futures.Executor):
         results are awaited if wait=True, but engines are *not* shutdown.
         """
         if wait:
-            # wait for *submission* of outstanding maps,
-            # otherwise view.wait won't know what to wait for
-            outstanding_maps = getattr(self.view, "_outstanding_maps")
-            if outstanding_maps:
+            if outstanding_maps := getattr(self.view, "_outstanding_maps"):
                 while outstanding_maps:
                     time.sleep(0.1)
             self.view.wait()

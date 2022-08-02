@@ -41,7 +41,7 @@ def _get_output(cmd):
     ],
 )
 def test_version(submod):
-    out = _get_output([sys.executable, '-m', 'ipyparallel.%s' % submod, '--version'])
+    out = _get_output([sys.executable, '-m', f'ipyparallel.{submod}', '--version'])
     assert out.strip() == ipyparallel.__version__
 
 
@@ -54,7 +54,9 @@ def test_version(submod):
     ],
 )
 def test_help_all(submod):
-    out = _get_output([sys.executable, '-m', 'ipyparallel.%s' % submod, '--help-all'])
+    out = _get_output(
+        [sys.executable, '-m', f'ipyparallel.{submod}', '--help-all']
+    )
 
 
 @pytest.mark.parametrize(

@@ -2,6 +2,7 @@
 """
 The IPython engine application
 """
+
 # Copyright (c) IPython Development Team.
 # Distributed under the terms of the Modified BSD License.
 import json
@@ -87,7 +88,7 @@ aliases = dict(
     location='IPEngine.location',
     timeout='IPEngine.timeout',
 )
-aliases.update(base_aliases)
+aliases |= base_aliases
 aliases.update(session_aliases)
 flags = {
     'mpi': (
@@ -97,7 +98,7 @@ flags = {
         "enable MPI integration",
     ),
 }
-flags.update(base_flags)
+flags |= base_flags
 flags.update(session_flags)
 
 
@@ -156,11 +157,8 @@ class IPEngine(BaseParallelApplication):
 
     @observe('cluster_id')
     def _cluster_id_changed(self, change):
-        if change['new']:
-            base = 'ipcontroller-{}'.format(change['new'])
-        else:
-            base = 'ipcontroller'
-        self.url_file_name = "%s-engine.json" % base
+        base = f"ipcontroller-{change['new']}" if change['new'] else 'ipcontroller'
+        self.url_file_name = f"{base}-engine.json"
 
     log_url = Unicode(
         '',
@@ -478,7 +476,7 @@ class IPEngine(BaseParallelApplication):
             ):
                 password = False
             else:
-                password = getpass("SSH Password for %s: " % self.sshserver)
+                password = getpass(f"SSH Password for {self.sshserver}: ")
         else:
             password = False
 
@@ -533,7 +531,7 @@ class IPEngine(BaseParallelApplication):
             )
             time.sleep(delay)
 
-        self.log.info("Registering with controller at %s" % self.registration_url)
+        self.log.info(f"Registering with controller at {self.registration_url}")
         ctx = self.context
         connect, maybe_tunnel = self.init_connector()
         reg = ctx.socket(zmq.DEALER)
@@ -739,8 +737,8 @@ class IPEngine(BaseParallelApplication):
 
             self.kernel.start()
         else:
-            self.log.fatal("Registration Failed: %s" % msg)
-            raise Exception("Registration Failed: %s" % msg)
+            self.log.fatal(f"Registration Failed: {msg}")
+            raise Exception(f"Registration Failed: {msg}")
 
         self.start_heartbeat(
             maybe_tunnel(url('hb_ping')),
@@ -776,7 +774,7 @@ class IPEngine(BaseParallelApplication):
             if self.curve_serverkey:
                 mon.setsockopt(zmq.CURVE_SERVER, 1)
                 mon.setsockopt(zmq.CURVE_SECRETKEY, self.curve_secretkey)
-            mport = mon.bind_to_random_port('tcp://%s' % localhost())
+            mport = mon.bind_to_random_port(f'tcp://{localhost()}')
             mon.setsockopt(zmq.SUBSCRIBE, b"")
             self._hb_listener = zmqstream.ZMQStream(mon, self.loop)
             self._hb_listener.on_recv(self._report_ping)
@@ -884,17 +882,23 @@ class IPEngine(BaseParallelApplication):
 
         self.load_connection_file()
 
-        exec_lines = []
-        for app in ('IPKernelApp', 'InteractiveShellApp'):
-            if '%s.exec_lines' % app in config:
-                exec_lines = config[app].exec_lines
-                break
+        exec_lines = next(
+            (
+                config[app].exec_lines
+                for app in ('IPKernelApp', 'InteractiveShellApp')
+                if f'{app}.exec_lines' in config
+            ),
+            [],
+        )
 
-        exec_files = []
-        for app in ('IPKernelApp', 'InteractiveShellApp'):
-            if '%s.exec_files' % app in config:
-                exec_files = config[app].exec_files
-                break
+        exec_files = next(
+            (
+                config[app].exec_files
+                for app in ('IPKernelApp', 'InteractiveShellApp')
+                if f'{app}.exec_files' in config
+            ),
+            [],
+        )
 
         config.IPKernelApp.exec_lines = exec_lines
         config.IPKernelApp.exec_files = exec_files

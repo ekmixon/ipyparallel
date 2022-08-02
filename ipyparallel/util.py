@@ -65,9 +65,7 @@ class ReverseDict(dict):
 
     def __init__(self, *args, **kwargs):
         dict.__init__(self, *args, **kwargs)
-        self._reverse = dict()
-        for key, value in self.items():
-            self._reverse[value] = key
+        self._reverse = {value: key for key, value in self.items()}
 
     def __getitem__(self, key):
         try:
@@ -131,9 +129,7 @@ def is_url(url):
     if '://' not in url:
         return False
     proto, addr = url.split('://', 1)
-    if proto.lower() not in ['tcp', 'pgm', 'epgm', 'ipc', 'inproc']:
-        return False
-    return True
+    return proto.lower() in ['tcp', 'pgm', 'epgm', 'ipc', 'inproc']
 
 
 def validate_url(url):
@@ -165,10 +161,6 @@ def validate_url(url):
             raise AssertionError(f"Invalid port {port!r} in url: {url!r}")
 
         assert addr == '*' or pat.match(addr) is not None, 'Invalid url: %r' % url
-
-    else:
-        # only validate tcp urls currently
-        pass
 
     return True
 
@@ -309,7 +301,7 @@ def _push(**ns):
     user_ns = get_ipython().user_global_ns
     tmp = '_IP_PUSH_TMP_'
     while tmp in user_ns:
-        tmp = tmp + '_'
+        tmp += '_'
     try:
         for name, value in ns.items():
             user_ns[tmp] = value
@@ -343,7 +335,7 @@ _random_ports = set()
 def select_random_ports(n):
     """Selects and return n random ports that are available."""
     ports = []
-    for i in range(n):
+    for _ in range(n):
         sock = socket.socket()
         sock.bind(('', 0))
         while sock.getsockname()[1] in _random_ports:
@@ -386,7 +378,7 @@ def integer_loglevel(loglevel):
 
 def connect_logger(logname, context, iface, root="ip", loglevel=logging.DEBUG):
     logger = logging.getLogger(logname)
-    if any([isinstance(h, handlers.PUBHandler) for h in logger.handlers]):
+    if any(isinstance(h, handlers.PUBHandler) for h in logger.handlers):
         # don't add a second PUBHandler
         return
     loglevel = integer_loglevel(loglevel)
@@ -404,7 +396,7 @@ def connect_engine_logger(context, iface, engine, loglevel=logging.DEBUG):
     from ipyparallel.engine.log import EnginePUBHandler
 
     logger = logging.getLogger()
-    if any([isinstance(h, handlers.PUBHandler) for h in logger.handlers]):
+    if any(isinstance(h, handlers.PUBHandler) for h in logger.handlers):
         # don't add a second PUBHandler
         return
     loglevel = integer_loglevel(loglevel)
@@ -420,7 +412,7 @@ def connect_engine_logger(context, iface, engine, loglevel=logging.DEBUG):
 def local_logger(logname, loglevel=logging.DEBUG):
     loglevel = integer_loglevel(loglevel)
     logger = logging.getLogger(logname)
-    if any([isinstance(h, logging.StreamHandler) for h in logger.handlers]):
+    if any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
         # don't add a second StreamHandler
         return
     handler = logging.StreamHandler()
@@ -491,10 +483,7 @@ def become_dask_worker(address, nanny=False, **kwargs):
         return
     from distributed import Worker, Nanny
 
-    if nanny:
-        w = Nanny(address, **kwargs)
-    else:
-        w = Worker(address, **kwargs)
+    w = Nanny(address, **kwargs) if nanny else Worker(address, **kwargs)
     shell.user_ns['dask_worker'] = shell.user_ns[
         'distributed_worker'
     ] = kernel.distributed_worker = w
@@ -520,10 +509,7 @@ def ensure_timezone(dt):
 
     If it doesn't have one, attach the local timezone.
     """
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=tzlocal())
-    else:
-        return dt
+    return dt.replace(tzinfo=tzlocal()) if dt.tzinfo is None else dt
 
 
 # extract_dates forward-port from jupyter_client 5.0
@@ -542,11 +528,11 @@ def _ensure_tzinfo(dt):
     if not dt.tzinfo:
         # No more naïve datetime objects!
         warnings.warn(
-            "Interpreting naïve datetime as local %s. Please add timezone info to timestamps."
-            % dt,
+            f"Interpreting naïve datetime as local {dt}. Please add timezone info to timestamps.",
             DeprecationWarning,
             stacklevel=4,
         )
+
         dt = dt.replace(tzinfo=tzlocal())
     return dt
 
@@ -560,8 +546,7 @@ def _parse_date(s):
     """
     if s is None:
         return s
-    m = ISO8601_PAT.match(s)
-    if m:
+    if m := ISO8601_PAT.match(s):
         dt = dateutil_parse(s)
         return _ensure_tzinfo(dt)
     return s
@@ -570,9 +555,7 @@ def _parse_date(s):
 def extract_dates(obj):
     """extract ISO8601 dates from unpacked JSON"""
     if isinstance(obj, dict):
-        new_obj = {}  # don't clobber
-        for k, v in obj.items():
-            new_obj[k] = extract_dates(v)
+        new_obj = {k: extract_dates(v) for k, v in obj.items()}
         obj = new_obj
     elif isinstance(obj, (list, tuple)):
         obj = [extract_dates(o) for o in obj]
@@ -665,9 +648,12 @@ def _all_profile_dirs():
     if not os.path.isdir(get_ipython_dir()):
         return profile_dirs
     with os.scandir(get_ipython_dir()) as paths:
-        for path in paths:
-            if path.is_dir() and path.name.startswith('profile_'):
-                profile_dirs.append(path.path)
+        profile_dirs.extend(
+            path.path
+            for path in paths
+            if path.is_dir() and path.name.startswith('profile_')
+        )
+
     return profile_dirs
 
 
@@ -736,9 +722,8 @@ def _trait_annotation(trait_type):
     """Return an annotation for a trait"""
     if trait_type in _traitlet_annotations:
         return _traitlet_annotations[trait_type]
-    else:
-        annotation = _traitlet_annotations[trait_type] = _TraitAnnotation(trait_type)
-        return annotation
+    annotation = _traitlet_annotations[trait_type] = _TraitAnnotation(trait_type)
+    return annotation
 
 
 def _traitlet_signature(cls):
@@ -752,11 +737,7 @@ def _traitlet_signature(cls):
             continue
         if "alias" in trait.metadata:
             name = trait.metadata["alias"]
-        if hasattr(trait, 'default'):
-            # traitlets 5
-            default = trait.default()
-        else:
-            default = trait.default_value
+        default = trait.default() if hasattr(trait, 'default') else trait.default_value
         if default is traitlets.Undefined:
             default = None
 
